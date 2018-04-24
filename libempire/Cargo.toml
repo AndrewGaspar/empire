@@ -1,0 +1,11 @@
+[package]
+name = "libempire"
+version = "0.1.0"
+authors = ["Andrew Gaspar <andrew.gaspar@outlook.com>"]
+
+[lib]
+name = "empire"
+crate-type = ["staticlib", "dylib"]
+
+[dependencies]
+empire = { path = "../empire" }

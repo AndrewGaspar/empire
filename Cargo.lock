@@ -1,0 +1,11 @@
+[[package]]
+name = "empire"
+version = "0.1.0"
+
+[[package]]
+name = "libempire"
+version = "0.1.0"
+dependencies = [
+ "empire 0.1.0",
+]
+
