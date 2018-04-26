@@ -7,3 +7,6 @@
 
 # Author uses vscode a lot, remove its workspace configuration
 .vscode
+
+# CMake directores
+build*
