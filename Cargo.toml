@@ -1,2 +1,2 @@
 [workspace]
-members=["empire", "libempire"]
+members=["empire", "libempire", "mpiexec"]

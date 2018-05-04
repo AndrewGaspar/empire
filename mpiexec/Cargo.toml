@@ -1,12 +1,8 @@
 [package]
-name = "libempire"
+name = "mpiexec"
 version = "0.1.0"
 authors = ["Andrew Gaspar <andrew.gaspar@outlook.com>"]
 
-[lib]
-name = "empire"
-crate-type = ["cdylib"]
-
 [dependencies]
 empire = { path = "../empire" }
-conv = "0.3"
+clap = "2.31"

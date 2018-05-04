@@ -1,0 +1,12 @@
+name: empire-exec
+version: "0.1"
+author: Andrew G. <andrew.gaspar@outlook.com>
+about: Executes MPI programs targeting empire
+args:
+    - numprocs:
+        short: n
+        value_name: NUMPROCS
+        help: Specifies the number of ranks to run in the job
+    - COMMAND:
+        help: Sets the command to run
+        required: true
