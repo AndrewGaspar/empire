@@ -40,7 +40,7 @@ pub fn universe() -> &'static Arc<RwLock<Universe>> {
 }
 
 fn initialize_mpi() -> Error {
-    unsafe { UNIVERSE = Some(Universe::new()) };
+    unsafe { UNIVERSE = Some(mpitry!(Universe::from_env())) };
 
     let locked = universe().write().unwrap();
 

@@ -2,7 +2,9 @@
 #include <stdio.h>
 
 int main(int argc, char **argv) {
-    MPI_Init(&argc, &argv);
+    int value = MPI_Init(&argc, &argv);
+    if (value != MPI_SUCCESS)
+        printf("MPI_Init failed: status = %d\n", value);
 
     int self_rank, self_size, self_flag;
     MPI_Comm_rank(MPI_COMM_SELF, &self_rank);

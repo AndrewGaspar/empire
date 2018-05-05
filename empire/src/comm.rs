@@ -1,4 +1,6 @@
-use super::{Error, Info, Universe};
+use super::{Info, Universe};
+use super::error::{self, Error};
+use super::port::Port;
 
 use std::process::Command;
 use std::ffi::OsString;
@@ -33,35 +35,52 @@ impl SpawnCommandInfo {
 
 pub struct Comm {
     universe: Weak<RwLock<Universe>>,
+
+    // properties
     name: Option<String>,
     rank: usize,
     size: usize,
     is_intercomm: bool,
+
+    // tracking state
+    ports: Vec<Option<Port>>,
 }
 
 impl Comm {
-    pub(crate) fn intracomm(universe: Weak<RwLock<Universe>>, rank: usize, size: usize) -> Self {
+    pub(crate) fn intracomm(
+        universe: Weak<RwLock<Universe>>,
+        rank: usize,
+        size: usize,
+    ) -> error::Result<Self> {
         assert!(rank < size);
 
-        Self {
+        let mut ports = Vec::new();
+        for _ in 0..size {
+            ports.push(None);
+        }
+        ports[rank] = Some(Port::new()?);
+
+        Ok(Self {
             universe,
             name: None,
             rank,
             size,
             is_intercomm: false,
-        }
+            ports,
+        })
     }
 
-    pub(crate) fn intercomm(universe: Weak<RwLock<Universe>>, rank: usize) -> Self {
+    pub(crate) fn intercomm(universe: Weak<RwLock<Universe>>, rank: usize) -> error::Result<Self> {
         assert!(rank < 2);
 
-        Self {
+        Ok(Self {
             universe,
             name: None,
             rank,
             size: 2,
             is_intercomm: true,
-        }
+            ports: vec![Some(Port::new()?), None],
+        })
     }
 
     pub fn name(&self) -> Option<&str> {
@@ -94,9 +113,16 @@ impl Comm {
         if root == self.rank {
             let commands = commands.expect("The root rank must supply commands to run.");
 
-            for spawn_command in commands.into_iter() {
+            let commands: Vec<_> = commands.into_iter().collect();
+
+            let world_size: usize = commands.iter().map(|command| command.max_procs).sum();
+
+            let mut world_rank = 0;
+            for spawn_command in &commands {
                 for _ in 0..spawn_command.max_procs {
                     let child = match Command::new(&spawn_command.command)
+                        .env("EMPIRE_COMM_WORLD_RANK", format!("{}", world_rank))
+                        .env("EMPIRE_COMM_WORLD_SIZE", format!("{}", world_size))
                         .args(&spawn_command.args)
                         .spawn()
                     {
@@ -108,6 +134,8 @@ impl Comm {
                     };
 
                     spawned.push(child);
+
+                    world_rank += 1;
                 }
             }
         }
@@ -116,7 +144,7 @@ impl Comm {
             child.wait().unwrap();
         }
 
-        Ok(Comm::intercomm(self.universe.clone(), 0))
+        Comm::intercomm(self.universe.clone(), 0)
     }
 
     pub fn spawn_multiple_root<'b, I: IntoIterator<Item = SpawnCommandInfo>>(

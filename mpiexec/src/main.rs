@@ -45,7 +45,7 @@ where
 }
 
 fn main() {
-    let universe = empire::Universe::new();
+    let universe = empire::Universe::new().unwrap();
 
     let args: Vec<_> = std::env::args_os().skip(1).collect();
 
@@ -72,7 +72,7 @@ fn main() {
 
     let locked = universe.write().unwrap();
 
-    let intercomm = locked.comm_self().spawn_multiple_root(commands, 0);
+    let intercomm = locked.comm_self().spawn_multiple_root(commands, 0).unwrap();
 
     // let command =
     //     match env::args().take(1).next() {

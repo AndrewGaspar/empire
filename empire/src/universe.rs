@@ -2,8 +2,25 @@ use super::{Comm, port::Port};
 use super::error;
 
 use std::collections::HashMap;
-use std::ffi::OsString;
+use std::env;
+use std::num::ParseIntError;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+
+fn read_integer_variable<F: FromStr<Err = ParseIntError>>(var_name: &str, default: F) -> F {
+    match env::var(var_name) {
+        Ok(world_size) => world_size
+            .parse()
+            .expect(&format!("{} was not an integer.", var_name)),
+        Err(err) => match err {
+            env::VarError::NotPresent => {
+                eprintln!("Warning: the environment is not correctly configured.");
+                default
+            }
+            env::VarError::NotUnicode(_) => panic!("{} could not be interepreted.", var_name),
+        },
+    }
+}
 
 pub struct Universe {
     // ports
@@ -23,22 +40,48 @@ impl Universe {
         }
     }
 
-    fn initialize(self_lock: &Arc<RwLock<Self>>) {
-        let comm_self_universe = Arc::downgrade(&self_lock);
-        let comm_world_universe = Arc::downgrade(&self_lock);
+    fn initialize_comm_self(universe: &Arc<RwLock<Self>>) -> error::Result<()> {
+        let comm_self_universe = Arc::downgrade(&universe);
 
-        let mut locked = self_lock.write().unwrap();
+        let mut locked = universe.write().unwrap();
+        locked.comm_self = Some(Comm::intracomm(comm_self_universe, 0, 1)?);
 
-        locked.comm_self = Some(Comm::intracomm(comm_self_universe, 0, 1));
-        locked.comm_world = Some(Comm::intracomm(comm_world_universe, 0, 1));
+        Ok(())
     }
 
-    pub fn new() -> Arc<RwLock<Self>> {
+    fn initialize_comm_world(
+        universe: &Arc<RwLock<Self>>,
+        rank: usize,
+        size: usize,
+    ) -> error::Result<()> {
+        let comm_world_universe = Arc::downgrade(&universe);
+
+        let mut locked = universe.write().unwrap();
+        locked.comm_world = Some(Comm::intracomm(comm_world_universe, rank, size)?);
+
+        Ok(())
+    }
+
+    pub fn new() -> error::Result<Arc<RwLock<Self>>> {
         let universe = Arc::new(RwLock::new(Universe::empty()));
 
-        Universe::initialize(&universe);
+        Self::initialize_comm_self(&universe)?;
+        Self::initialize_comm_world(&universe, 0, 1)?;
 
-        universe
+        Ok(universe)
+    }
+
+    pub fn from_env() -> error::Result<Arc<RwLock<Self>>> {
+        let universe = Arc::new(RwLock::new(Universe::empty()));
+
+        Self::initialize_comm_self(&universe)?;
+
+        let rank = read_integer_variable("EMPIRE_COMM_WORLD_RANK", 0usize);
+        let size = read_integer_variable("EMPIRE_COMM_WORLD_SIZE", 1usize);
+
+        Self::initialize_comm_world(&universe, rank, size)?;
+
+        Ok(universe)
     }
 
     pub fn comm_self_opt(&self) -> &Option<Comm> {
