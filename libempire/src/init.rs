@@ -5,16 +5,31 @@ use std::slice;
 use std::sync::{Arc, RwLock};
 
 use super::status::*;
+use super::handles::*;
 
-use empire::{Comm, Universe};
+use empire::{Comm, Info, Universe};
 
 static mut UNIVERSE: Option<Arc<RwLock<Universe>>> = None;
 
 #[no_mangle]
-pub static mut MPI_COMM_SELF: *const Comm = ptr::null();
+pub static mut MPI_COMM_SELF: MPI_Comm = MPI_Comm {
+    handle: ptr::null(),
+};
 
 #[no_mangle]
-pub static mut MPI_COMM_WORLD: *const Comm = ptr::null();
+pub static mut MPI_COMM_WORLD: MPI_Comm = MPI_Comm {
+    handle: ptr::null(),
+};
+
+#[no_mangle]
+pub static mut MPI_COMM_NULL: MPI_Comm = MPI_Comm {
+    handle: ptr::null(),
+};
+
+#[no_mangle]
+pub static mut MPI_INFO_NULL: MPI_Info = MPI_Info {
+    handle: ptr::null(),
+};
 
 pub fn universe() -> &'static Arc<RwLock<Universe>> {
     unsafe {
@@ -24,8 +39,35 @@ pub fn universe() -> &'static Arc<RwLock<Universe>> {
     }
 }
 
+fn initialize_mpi() -> Error {
+    let locked = universe().write().unwrap();
+
+    unsafe {
+        MPI_COMM_SELF = MPI_Comm {
+            handle: locked.comm_self_opt(),
+        }
+    };
+    unsafe {
+        MPI_COMM_WORLD = MPI_Comm {
+            handle: locked.comm_world_opt(),
+        }
+    };
+    unsafe {
+        MPI_COMM_NULL = MPI_Comm {
+            handle: Box::into_raw(Box::new(None)),
+        }
+    };
+    unsafe {
+        MPI_INFO_NULL = MPI_Info {
+            handle: Box::into_raw(Box::new(None)),
+        }
+    };
+
+    Error::MPI_SUCCESS
+}
+
 #[no_mangle]
-pub extern "C" fn MPI_Init(argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_int {
+pub extern "C" fn MPI_Init(argc: *mut c_int, argv: *mut *mut *mut c_char) -> Error {
     {
         let universe = match unsafe { (argc.as_ref(), argv.as_ref()) } {
             (Some(argc), Some(argv)) => {
@@ -41,17 +83,12 @@ pub extern "C" fn MPI_Init(argc: *mut c_int, argv: *mut *mut *mut c_char) -> c_i
         unsafe { UNIVERSE = Some(universe) };
     }
 
-    let locked = universe().write().unwrap();
-
-    unsafe { MPI_COMM_SELF = locked.comm_self() };
-    unsafe { MPI_COMM_WORLD = locked.comm_world() };
-
-    MPI_SUCCESS
+    initialize_mpi()
 }
 
 #[cfg(windows)]
 #[no_mangle]
-pub extern "C" fn MPI_InitW(argc: *mut c_int, argv: *mut *mut *mut u16) -> c_int {
+pub extern "C" fn MPI_InitW(argc: *mut c_int, argv: *mut *mut *mut u16) -> Error {
     {
         let universe = match unsafe { (argc.as_ref(), argv.as_ref()) } {
             (Some(argc), Some(argv)) => {
@@ -67,23 +104,21 @@ pub extern "C" fn MPI_InitW(argc: *mut c_int, argv: *mut *mut *mut u16) -> c_int
         unsafe { UNIVERSE = Some(universe) };
     }
 
-    let locked = universe().write().unwrap();
-
-    unsafe {
-        MPI_COMM_SELF = locked.comm_self();
-        MPI_COMM_WORLD = locked.comm_world();
-    }
-
-    MPI_SUCCESS
+    initialize_mpi()
 }
 
 #[no_mangle]
-pub extern "C" fn MPI_Finalize() -> c_int {
+pub extern "C" fn MPI_Finalize() -> Error {
     unsafe {
         UNIVERSE = None;
-        MPI_COMM_SELF = ptr::null();
-        MPI_COMM_WORLD = ptr::null();
+
+        Box::from_raw(MPI_COMM_NULL.handle as *mut Option<Comm>);
+        Box::from_raw(MPI_INFO_NULL.handle as *mut Option<Info>);
+
+        MPI_COMM_SELF.handle = ptr::null();
+        MPI_COMM_WORLD.handle = ptr::null();
+        MPI_COMM_NULL.handle = ptr::null();
     }
 
-    MPI_SUCCESS
+    Error::MPI_SUCCESS
 }

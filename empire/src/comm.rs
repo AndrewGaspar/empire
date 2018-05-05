@@ -33,17 +33,43 @@ impl SpawnCommandInfo {
 
 pub struct Comm {
     universe: Weak<RwLock<Universe>>,
+    name: Option<String>,
     rank: usize,
     size: usize,
+    is_intercomm: bool,
 }
 
 impl Comm {
-    pub(crate) fn new(universe: Weak<RwLock<Universe>>, rank: usize, size: usize) -> Self {
+    pub(crate) fn intracomm(universe: Weak<RwLock<Universe>>, rank: usize, size: usize) -> Self {
+        assert!(rank < size);
+
         Self {
             universe,
+            name: None,
             rank,
             size,
+            is_intercomm: false,
         }
+    }
+
+    pub(crate) fn intercomm(universe: Weak<RwLock<Universe>>, rank: usize) -> Self {
+        assert!(rank < 2);
+
+        Self {
+            universe,
+            name: None,
+            rank,
+            size: 2,
+            is_intercomm: true,
+        }
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|name| name.as_str())
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = Some(name);
     }
 
     pub fn rank(&self) -> usize {
@@ -52,6 +78,10 @@ impl Comm {
 
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn is_intercomm(&self) -> bool {
+        self.is_intercomm
     }
 
     pub fn spawn_multiple<'b, I: IntoIterator<Item = SpawnCommandInfo>>(
@@ -86,7 +116,7 @@ impl Comm {
             child.wait().unwrap();
         }
 
-        Ok(Comm::new(self.universe.clone(), 0, 2))
+        Ok(Comm::intercomm(self.universe.clone(), 0))
     }
 
     pub fn spawn_multiple_root<'b, I: IntoIterator<Item = SpawnCommandInfo>>(

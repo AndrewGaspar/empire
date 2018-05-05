@@ -3,14 +3,16 @@ use std::ffi::OsString;
 
 #[derive(Debug)]
 pub enum Error {
-    IoError(std::io::Error),
     CommandNotFound(OsString),
+    NoSuchPort(String),
+    IoError(std::io::Error),
 }
 
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match self {
             &Error::CommandNotFound(_) => "empire could not find the requested command",
+            &Error::NoSuchPort(_) => "empire could not find a port with the given name",
             &Error::IoError(ref err) => err.description(),
         }
     }
@@ -24,6 +26,9 @@ impl std::fmt::Display for Error {
                 "empire could not find the command '{}'",
                 command.to_str().unwrap_or("Error converting command name")
             ),
+            &Error::NoSuchPort(ref port_name) => {
+                write!(f, "empire could not find the port '{}'", port_name)
+            }
             &Error::IoError(ref err) => err.fmt(f),
             _ => {
                 use std::error::Error;

@@ -11,3 +11,4 @@ else()
 endif()
 
 add_executable(hello_mpi hello_mpi.c)
+add_executable(open_port open_port.c)
