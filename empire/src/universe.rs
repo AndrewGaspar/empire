@@ -33,8 +33,8 @@ impl Universe {
     }
 
     fn initialize(self_lock: &Arc<RwLock<Self>>) {
-        let comm_self_universe = self_lock.clone();
-        let comm_world_universe = self_lock.clone();
+        let comm_self_universe = Arc::downgrade(&self_lock);
+        let comm_world_universe = Arc::downgrade(&self_lock);
 
         let mut locked = self_lock.write().unwrap();
 

@@ -3,7 +3,7 @@ use super::{Error, Info, Universe};
 use std::process::Command;
 use std::ffi::OsString;
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::sync::{RwLock, Weak};
 
 pub struct SpawnCommandInfo {
     command: OsString,
@@ -32,13 +32,13 @@ impl SpawnCommandInfo {
 }
 
 pub struct Comm {
-    universe: Arc<RwLock<Universe>>,
+    universe: Weak<RwLock<Universe>>,
     rank: usize,
     size: usize,
 }
 
 impl Comm {
-    pub(crate) fn new(universe: Arc<RwLock<Universe>>, rank: usize, size: usize) -> Self {
+    pub(crate) fn new(universe: Weak<RwLock<Universe>>, rank: usize, size: usize) -> Self {
         Self {
             universe,
             rank,
