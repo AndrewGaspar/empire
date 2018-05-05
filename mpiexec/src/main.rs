@@ -45,7 +45,7 @@ where
 }
 
 fn main() {
-    let universe = empire::UniverseBuilder::new().build();
+    let universe = empire::Universe::new();
 
     let args: Vec<_> = std::env::args_os().skip(1).collect();
 

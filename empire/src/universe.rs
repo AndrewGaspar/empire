@@ -5,22 +5,6 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::sync::{Arc, RwLock};
 
-pub struct UniverseBuilder {}
-
-impl UniverseBuilder {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn build(&self) -> Arc<RwLock<Universe>> {
-        let universe = Arc::new(RwLock::new(Universe::empty()));
-
-        Universe::initialize(&universe);
-
-        universe
-    }
-}
-
 pub struct Universe {
     // ports
     ports: HashMap<String, Box<Port>>,
@@ -50,15 +34,11 @@ impl Universe {
     }
 
     pub fn new() -> Arc<RwLock<Self>> {
-        UniverseBuilder::new().build()
-    }
+        let universe = Arc::new(RwLock::new(Universe::empty()));
 
-    pub fn from_args<I: IntoIterator<Item = String>>(_: I) -> Arc<RwLock<Self>> {
-        UniverseBuilder::new().build()
-    }
+        Universe::initialize(&universe);
 
-    pub fn from_args_os<I: IntoIterator<Item = OsString>>(_: I) -> Arc<RwLock<Self>> {
-        UniverseBuilder::new().build()
+        universe
     }
 
     pub fn comm_self_opt(&self) -> &Option<Comm> {

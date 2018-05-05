@@ -40,6 +40,8 @@ pub fn universe() -> &'static Arc<RwLock<Universe>> {
 }
 
 fn initialize_mpi() -> Error {
+    unsafe { UNIVERSE = Some(Universe::new()) };
+
     let locked = universe().write().unwrap();
 
     unsafe {
@@ -67,43 +69,13 @@ fn initialize_mpi() -> Error {
 }
 
 #[no_mangle]
-pub extern "C" fn MPI_Init(argc: *mut c_int, argv: *mut *mut *mut c_char) -> Error {
-    {
-        let universe = match unsafe { (argc.as_ref(), argv.as_ref()) } {
-            (Some(argc), Some(argv)) => {
-                let args = unsafe { slice::from_raw_parts(*argv, *argc as usize) };
-                Universe::from_args(
-                    args.iter()
-                        .map(|arg| unsafe { CStr::from_ptr(*arg) }.to_str().unwrap().to_owned()),
-                )
-            }
-            _ => Universe::new(),
-        };
-
-        unsafe { UNIVERSE = Some(universe) };
-    }
-
+pub extern "C" fn MPI_Init(_: *mut c_int, _: *mut *mut *mut c_char) -> Error {
     initialize_mpi()
 }
 
 #[cfg(windows)]
 #[no_mangle]
-pub extern "C" fn MPI_InitW(argc: *mut c_int, argv: *mut *mut *mut u16) -> Error {
-    {
-        let universe = match unsafe { (argc.as_ref(), argv.as_ref()) } {
-            (Some(argc), Some(argv)) => {
-                let args = unsafe { slice::from_raw_parts(*argv, *argc as usize) };
-                Universe::from_args_os(
-                    args.iter()
-                        .map(|arg| unsafe { super::windows::win_string_from_ptr(*arg) }),
-                )
-            }
-            _ => Universe::new(),
-        };
-
-        unsafe { UNIVERSE = Some(universe) };
-    }
-
+pub extern "C" fn MPI_InitW(_: *mut c_int, _: *mut *mut *mut u16) -> Error {
     initialize_mpi()
 }
 
