@@ -5,7 +5,9 @@ use super::port::Port;
 use std::process::Command;
 use std::ffi::OsString;
 use std::io;
-use std::sync::{RwLock, Weak};
+use std::sync::{Arc, RwLock, Weak};
+
+use tokio_process::CommandExt;
 
 pub struct SpawnCommandInfo {
     command: OsString,
@@ -44,6 +46,7 @@ pub struct Comm {
 
     // tracking state
     ports: Vec<Option<Port>>,
+    child_commands: Vec<Command>,
 }
 
 impl Comm {
@@ -67,6 +70,7 @@ impl Comm {
             size,
             is_intercomm: false,
             ports,
+            child_commands: Vec::new(),
         })
     }
 
@@ -80,6 +84,7 @@ impl Comm {
             size: 2,
             is_intercomm: true,
             ports: vec![Some(Port::new()?), None],
+            child_commands: Vec::new(),
         })
     }
 
@@ -103,48 +108,70 @@ impl Comm {
         self.is_intercomm
     }
 
+    pub fn port(&self, idx: usize) -> &Option<Port> {
+        &self.ports[idx]
+    }
+
+    pub fn attach_children(&mut self, commands: Vec<Command>) {
+        self.child_commands = commands;
+    }
+
+    pub(crate) fn universe(&self) -> Arc<RwLock<Universe>> {
+        self.universe
+            .upgrade()
+            .expect("The MPI Universe has been destroyed - this Comm object was leaked")
+    }
+
     pub fn spawn_multiple<'b, I: IntoIterator<Item = SpawnCommandInfo>>(
         &self,
         commands: Option<I>,
         root: usize,
     ) -> super::Result<Comm> {
+        // This needs to eventually support intracomms other than MPI_COMM_SELF
+        assert!(root == self.rank());
+        assert!(self.size() == 1);
+
+        let mut intercomm = Comm::intercomm(self.universe.clone(), 0)?;
+
         let mut spawned = Vec::new();
 
-        if root == self.rank {
-            let commands = commands.expect("The root rank must supply commands to run.");
+        let commands = commands.expect("The root rank must supply commands to run.");
 
-            let commands: Vec<_> = commands.into_iter().collect();
+        let commands: Vec<_> = commands.into_iter().collect();
 
-            let world_size: usize = commands.iter().map(|command| command.max_procs).sum();
+        let world_size: usize = commands.iter().map(|command| command.max_procs).sum();
 
-            let mut world_rank = 0;
-            for spawn_command in &commands {
-                for _ in 0..spawn_command.max_procs {
-                    let child = match Command::new(&spawn_command.command)
-                        .env("EMPIRE_COMM_WORLD_RANK", format!("{}", world_rank))
-                        .env("EMPIRE_COMM_WORLD_SIZE", format!("{}", world_size))
-                        .args(&spawn_command.args)
-                        .spawn()
-                    {
-                        Ok(child) => child,
-                        Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                            return Err(Error::CommandNotFound(spawn_command.command.clone()));
-                        }
-                        Err(err) => return Err(err.into()),
-                    };
+        let universe = self.universe().write().unwrap();
 
-                    spawned.push(child);
-
-                    world_rank += 1;
+        commands
+            .iter()
+            .flat_map(|spawn_command| (0..spawn_command.max_procs).map(|_| spawn_command))
+            .enumerate()
+            .map(|(world_rank, spawn_command)| {
+                match Command::new(&spawn_command.command)
+                    .env("EMPIRE_COMM_WORLD_RANK", format!("{}", world_rank))
+                    .env("EMPIRE_COMM_WORLD_SIZE", format!("{}", world_size))
+                    .env(
+                        "EMPIRE_COMM_WORLD_PARENT_PORT",
+                        format!("{}", intercomm.port(0).as_ref().unwrap().name()),
+                    )
+                    .args(&spawn_command.args)
+                    .spawn_async(universe.runtime().reactor())
+                {
+                    Ok(child) => Ok(child),
+                    Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                        Err(Error::CommandNotFound(spawn_command.command.clone()))
+                    }
+                    Err(err) => Err(err.into()),
                 }
-            }
-        }
+            })
+            .collect();
 
         for mut child in spawned {
             child.wait().unwrap();
         }
 
-        Comm::intercomm(self.universe.clone(), 0)
+        Ok(intercomm)
     }
 
     pub fn spawn_multiple_root<'b, I: IntoIterator<Item = SpawnCommandInfo>>(

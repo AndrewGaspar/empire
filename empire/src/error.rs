@@ -1,11 +1,14 @@
 use std;
 use std::ffi::OsString;
 
+use tokio;
+
 #[derive(Debug)]
 pub enum Error {
     CommandNotFound(OsString),
     NoSuchPort(String),
     IoError(std::io::Error),
+    TokioIoError(tokio::io::Error),
 }
 
 impl std::error::Error for Error {
@@ -14,6 +17,7 @@ impl std::error::Error for Error {
             &Error::CommandNotFound(_) => "empire could not find the requested command",
             &Error::NoSuchPort(_) => "empire could not find a port with the given name",
             &Error::IoError(ref err) => err.description(),
+            &Error::TokioIoError(ref err) => err.description(),
         }
     }
 }
@@ -34,6 +38,11 @@ impl std::fmt::Display for Error {
                 use std::error::Error;
                 write!(f, "{}", self.description())
             }
+            &Error::TokioIoError(ref err) => err.fmt(f),
+            _ => {
+                use std::error::Error;
+                write!(f, "{}", self.description())
+            }
         }
     }
 }
@@ -43,5 +52,11 @@ impl From<std::io::Error> for Error {
         Error::IoError(err)
     }
 }
+
+// impl From<tokio::io::Error> for Error {
+//     fn from(err: tokio::io::Error) -> Self {
+//         Error::TokioIoError(err)
+//     }
+// }
 
 pub type Result<T> = std::result::Result<T, Error>;

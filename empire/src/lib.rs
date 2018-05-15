@@ -1,3 +1,6 @@
+extern crate tokio;
+extern crate tokio_process;
+
 pub mod comm;
 pub mod error;
 pub mod info;

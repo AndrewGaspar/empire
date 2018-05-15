@@ -4,8 +4,12 @@ use super::error;
 use std::collections::HashMap;
 use std::env;
 use std::num::ParseIntError;
+use std::thread::Thread;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+
+use tokio::executor::thread_pool;
+use tokio::runtime::{self, Runtime};
 
 fn read_integer_variable<F: FromStr<Err = ParseIntError>>(var_name: &str, default: F) -> F {
     match env::var(var_name) {
@@ -23,6 +27,9 @@ fn read_integer_variable<F: FromStr<Err = ParseIntError>>(var_name: &str, defaul
 }
 
 pub struct Universe {
+    // runtime state
+    runtime: Runtime,
+
     // ports
     ports: HashMap<String, Box<Port>>,
 
@@ -32,12 +39,22 @@ pub struct Universe {
 }
 
 impl Universe {
-    fn empty() -> Self {
-        Self {
+    fn new() -> error::Result<Self> {
+        let mut thread_pool_builder = thread_pool::Builder::new();
+        thread_pool_builder
+            .name_prefix("empire-io-thread-")
+            .pool_size(1);
+
+        let runtime = runtime::Builder::new()
+            .threadpool_builder(thread_pool_builder)
+            .build()?;
+
+        Ok(Self {
+            runtime,
             ports: HashMap::new(),
             comm_self: None,
             comm_world: None,
-        }
+        })
     }
 
     fn initialize_comm_self(universe: &Arc<RwLock<Self>>) -> error::Result<()> {
@@ -62,17 +79,8 @@ impl Universe {
         Ok(())
     }
 
-    pub fn new() -> error::Result<Arc<RwLock<Self>>> {
-        let universe = Arc::new(RwLock::new(Universe::empty()));
-
-        Self::initialize_comm_self(&universe)?;
-        Self::initialize_comm_world(&universe, 0, 1)?;
-
-        Ok(universe)
-    }
-
     pub fn from_env() -> error::Result<Arc<RwLock<Self>>> {
-        let universe = Arc::new(RwLock::new(Universe::empty()));
+        let universe = Arc::new(RwLock::new(Universe::new()?));
 
         Self::initialize_comm_self(&universe)?;
 
@@ -98,6 +106,14 @@ impl Universe {
 
     pub fn comm_world(&self) -> &Comm {
         self.comm_world.as_ref().unwrap()
+    }
+
+    pub(crate) fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+
+    pub(crate) fn runtime_mut(&mut self) -> &mut Runtime {
+        &mut self.runtime
     }
 
     pub fn open_port(&mut self) -> error::Result<&Port> {
