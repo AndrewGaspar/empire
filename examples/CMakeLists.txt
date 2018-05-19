@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-project(empire-examples C)
+project(empire-examples C CXX)
 
 include_directories(${CMAKE_SOURCE_DIR}/../libempire/include)
 link_directories(${CMAKE_SOURCE_DIR}/../target/debug)
@@ -12,3 +12,5 @@ endif()
 
 add_executable(hello_mpi hello_mpi.c)
 add_executable(open_port open_port.c)
+add_executable(spawn_self spawn_self.cpp)
+add_executable(spawn_self_w spawn_self_w.cpp)

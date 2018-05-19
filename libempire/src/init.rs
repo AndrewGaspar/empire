@@ -1,29 +1,24 @@
-use std::ffi::CStr;
-use std::os::raw::{c_char, c_int};
-use std::ptr;
-use std::slice;
-use std::sync::{Arc, RwLock};
+use std::{ptr, boxed::Box, os::raw::{c_char, c_int}, sync::{Arc, RwLock}};
 
-use super::status::*;
-use super::handles::*;
+use super::{handles::*, status::*};
 
-use empire::{Comm, Info, Universe};
+use empire::{Info, Universe};
 
 static mut UNIVERSE: Option<Arc<RwLock<Universe>>> = None;
 
 #[no_mangle]
 pub static mut MPI_COMM_SELF: MPI_Comm = MPI_Comm {
-    handle: ptr::null(),
+    handle: ptr::null_mut(),
 };
 
 #[no_mangle]
 pub static mut MPI_COMM_WORLD: MPI_Comm = MPI_Comm {
-    handle: ptr::null(),
+    handle: ptr::null_mut(),
 };
 
 #[no_mangle]
 pub static mut MPI_COMM_NULL: MPI_Comm = MPI_Comm {
-    handle: ptr::null(),
+    handle: ptr::null_mut(),
 };
 
 #[no_mangle]
@@ -45,20 +40,12 @@ fn initialize_mpi() -> Error {
     let locked = universe().write().unwrap();
 
     unsafe {
-        MPI_COMM_SELF = MPI_Comm {
-            handle: locked.comm_self_opt(),
-        }
+        MPI_COMM_SELF = MPI_Comm::new(CommHandle::SystemComm(Arc::downgrade(&locked.comm_self())))
     };
     unsafe {
-        MPI_COMM_WORLD = MPI_Comm {
-            handle: locked.comm_world_opt(),
-        }
+        MPI_COMM_WORLD = MPI_Comm::new(CommHandle::SystemComm(Arc::downgrade(&locked.comm_world())))
     };
-    unsafe {
-        MPI_COMM_NULL = MPI_Comm {
-            handle: Box::into_raw(Box::new(None)),
-        }
-    };
+    unsafe { MPI_COMM_NULL = MPI_Comm::new(CommHandle::NullComm) };
     unsafe {
         MPI_INFO_NULL = MPI_Info {
             handle: Box::into_raw(Box::new(None)),
@@ -82,14 +69,14 @@ pub extern "C" fn MPI_InitW(_: *mut c_int, _: *mut *mut *mut u16) -> Error {
 #[no_mangle]
 pub extern "C" fn MPI_Finalize() -> Error {
     unsafe {
-        UNIVERSE = None;
+        MPI_COMM_SELF.free();
+        MPI_COMM_WORLD.free();
+        MPI_COMM_NULL.free();
 
-        Box::from_raw(MPI_COMM_NULL.handle as *mut Option<Comm>);
         Box::from_raw(MPI_INFO_NULL.handle as *mut Option<Info>);
+        MPI_INFO_NULL.handle = ptr::null();
 
-        MPI_COMM_SELF.handle = ptr::null();
-        MPI_COMM_WORLD.handle = ptr::null();
-        MPI_COMM_NULL.handle = ptr::null();
+        UNIVERSE = None;
     }
 
     Error::MPI_SUCCESS

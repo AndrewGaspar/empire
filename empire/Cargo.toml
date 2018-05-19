@@ -5,4 +5,5 @@ authors = ["Andrew Gaspar <andrew.gaspar@outlook.com>"]
 
 [dependencies]
 tokio = "0.1"
-tokio-process ="0.1"
+tokio-process = { git = "https://github.com/alexcrichton/tokio-process.git" }
+futures = "0.1"

@@ -1,13 +1,6 @@
-use super::Error;
+use super::{universe, Error, constants::*, handles::MPI_Info};
 
-use super::constants::*;
-use super::handles::MPI_Info;
-use super::universe;
-
-use std::cmp::min;
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::slice;
+use std::{slice, cmp::min, ffi::CStr, os::raw::c_char};
 
 #[no_mangle]
 pub extern "C" fn MPI_Open_port(_: MPI_Info, port_name: *mut c_char) -> Error {

@@ -1,6 +1,4 @@
-use std::slice;
-use std::ffi::OsString;
-use std::os::windows::ffi::OsStringExt;
+use std::{slice, ffi::OsString, os::windows::ffi::OsStringExt};
 
 pub unsafe fn win_string_from_ptr(ptr: *const u16) -> OsString {
     let mut null_term_offset: usize = 0;

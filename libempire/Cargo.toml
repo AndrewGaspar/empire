@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 [dependencies]
 empire = { path = "../empire" }
 conv = "0.3"
+itertools = "0.7.3"

@@ -40,12 +40,13 @@ where
         .arg(
             Arg::with_name("command_args")
                 .help("The arguments to be passed to 'command'")
-                .last(true),
+                .last(true)
+                .multiple(true),
         )
 }
 
 fn main() {
-    let universe = empire::Universe::from_env().unwrap();
+    let universe = empire::Universe::root().unwrap();
 
     let args: Vec<_> = std::env::args_os().skip(1).collect();
 
@@ -72,13 +73,22 @@ fn main() {
 
     let locked = universe.write().unwrap();
 
-    let intercomm = locked.comm_self().spawn_multiple_root(commands, 0).unwrap();
+    let mut any_failures = false;
+    {
+        let empire::comm::SpawnMultipleResult { comm, results } = locked
+            .comm_self()
+            .spawn_multiple_root(commands, 0)
+            .expect("Failed to spawn MPI processes");
 
-    // let command =
-    //     match env::args().take(1).next() {
-    //         Some(command) => command,
-    //         None => {
+        for x in 0..results.len() {
+            if let Err(ref err) = results[x] {
+                eprintln!("Error: Could not spawn MPI rank {}. {}", x, err);
+                any_failures = true;
+            }
+        }
+    }
 
-    //         }
-    //     };
+    if any_failures {
+        std::process::exit(1);
+    }
 }

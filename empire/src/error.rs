@@ -1,5 +1,4 @@
-use std;
-use std::ffi::OsString;
+use std::{self, ffi::OsString};
 
 use tokio;
 
@@ -9,6 +8,7 @@ pub enum Error {
     NoSuchPort(String),
     IoError(std::io::Error),
     TokioIoError(tokio::io::Error),
+    FailExitCode(i32),
 }
 
 impl std::error::Error for Error {
@@ -18,6 +18,7 @@ impl std::error::Error for Error {
             &Error::NoSuchPort(_) => "empire could not find a port with the given name",
             &Error::IoError(ref err) => err.description(),
             &Error::TokioIoError(ref err) => err.description(),
+            &Error::FailExitCode(_) => "launched process exited early with a failure code",
         }
     }
 }
@@ -34,15 +35,8 @@ impl std::fmt::Display for Error {
                 write!(f, "empire could not find the port '{}'", port_name)
             }
             &Error::IoError(ref err) => err.fmt(f),
-            _ => {
-                use std::error::Error;
-                write!(f, "{}", self.description())
-            }
             &Error::TokioIoError(ref err) => err.fmt(f),
-            _ => {
-                use std::error::Error;
-                write!(f, "{}", self.description())
-            }
+            &Error::FailExitCode(code) => write!(f, "child process exited with code '{}'", code),
         }
     }
 }

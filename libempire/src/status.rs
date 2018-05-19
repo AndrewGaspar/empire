@@ -80,19 +80,28 @@ pub enum Error {
     MPI_ERR_LASTCODE,
 }
 
-pub fn to_mpi_error(err: error::Error) -> Error {
+pub fn result_to_mpi_error<T>(result: &error::Result<T>) -> Error {
+    match result {
+        Ok(_) => Error::MPI_SUCCESS,
+        Err(ref err) => error_to_mpi_error(err),
+    }
+}
+
+pub fn error_to_mpi_error(err: &error::Error) -> Error {
     match err {
         error::Error::CommandNotFound(_) => Error::MPI_ERR_NO_SUCH_FILE,
         error::Error::NoSuchPort(_) => Error::MPI_ERR_PORT,
         error::Error::IoError(_) => Error::MPI_ERR_IO,
+        error::Error::TokioIoError(_) => Error::MPI_ERR_IO,
+        error::Error::FailExitCode(_) => Error::MPI_ERR_SPAWN,
     }
 }
 
 macro_rules! mpitry {
-    ($e: expr) => {
+    ($e:expr) => {
         match $e {
             Ok(var) => var,
-            Err(err) => return ::status::to_mpi_error(err),
+            Err(ref err) => return ::status::error_to_mpi_error(err),
         }
     };
 }

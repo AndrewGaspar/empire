@@ -1,15 +1,6 @@
-use super::{Comm, port::Port};
-use super::error;
+use super::{error, registrar, Comm, port::Port};
 
-use std::collections::HashMap;
-use std::env;
-use std::num::ParseIntError;
-use std::thread::Thread;
-use std::str::FromStr;
-use std::sync::{Arc, RwLock};
-
-use tokio::executor::thread_pool;
-use tokio::runtime::{self, Runtime};
+use std::{env, collections::HashMap, num::ParseIntError, str::FromStr, sync::{Arc, RwLock}};
 
 fn read_integer_variable<F: FromStr<Err = ParseIntError>>(var_name: &str, default: F) -> F {
     match env::var(var_name) {
@@ -26,34 +17,40 @@ fn read_integer_variable<F: FromStr<Err = ParseIntError>>(var_name: &str, defaul
     }
 }
 
-pub struct Universe {
-    // runtime state
-    runtime: Runtime,
+pub struct CommRegistration(registrar::Registration<Comm>);
 
+impl CommRegistration {
+    pub fn unwrap(&self) -> Arc<Comm> {
+        self.0
+            .get()
+            .upgrade()
+            .expect("The communicator has already been freed.")
+    }
+}
+
+pub struct Universe {
     // ports
     ports: HashMap<String, Box<Port>>,
 
     // standard communicators
-    comm_self: Option<Comm>,
-    comm_world: Option<Comm>,
+    comm_self: Option<CommRegistration>,
+    comm_world: Option<CommRegistration>,
+    comm_parent: Option<CommRegistration>,
+
+    // communicator strong references are held by Universe so that if the Universe is destroyed
+    // these communicators get cleaned up correctly, and destroying user references will result in
+    // a reasonable
+    registrar: registrar::Registrar<Comm>,
 }
 
 impl Universe {
     fn new() -> error::Result<Self> {
-        let mut thread_pool_builder = thread_pool::Builder::new();
-        thread_pool_builder
-            .name_prefix("empire-io-thread-")
-            .pool_size(1);
-
-        let runtime = runtime::Builder::new()
-            .threadpool_builder(thread_pool_builder)
-            .build()?;
-
         Ok(Self {
-            runtime,
             ports: HashMap::new(),
             comm_self: None,
             comm_world: None,
+            comm_parent: None,
+            registrar: registrar::Registrar::new(),
         })
     }
 
@@ -61,7 +58,8 @@ impl Universe {
         let comm_self_universe = Arc::downgrade(&universe);
 
         let mut locked = universe.write().unwrap();
-        locked.comm_self = Some(Comm::intracomm(comm_self_universe, 0, 1)?);
+        let registration = locked.register_comm(Comm::intracomm(comm_self_universe, 0, 1)?);
+        locked.comm_self = Some(registration);
 
         Ok(())
     }
@@ -74,9 +72,19 @@ impl Universe {
         let comm_world_universe = Arc::downgrade(&universe);
 
         let mut locked = universe.write().unwrap();
-        locked.comm_world = Some(Comm::intracomm(comm_world_universe, rank, size)?);
+        let registration = locked.register_comm(Comm::intracomm(comm_world_universe, rank, size)?);
+        locked.comm_world = Some(registration);
 
         Ok(())
+    }
+
+    pub fn root() -> error::Result<Arc<RwLock<Self>>> {
+        let universe = Arc::new(RwLock::new(Universe::new()?));
+
+        Self::initialize_comm_self(&universe)?;
+        Self::initialize_comm_world(&universe, 0, 1)?;
+
+        Ok(universe)
     }
 
     pub fn from_env() -> error::Result<Arc<RwLock<Self>>> {
@@ -92,28 +100,20 @@ impl Universe {
         Ok(universe)
     }
 
-    pub fn comm_self_opt(&self) -> &Option<Comm> {
-        &self.comm_self
+    pub fn comm_self(&self) -> Arc<Comm> {
+        self.comm_self.as_ref().unwrap().unwrap()
     }
 
-    pub fn comm_world_opt(&self) -> &Option<Comm> {
-        &self.comm_world
+    pub fn comm_world(&self) -> Arc<Comm> {
+        self.comm_world.as_ref().unwrap().unwrap()
     }
 
-    pub fn comm_self(&self) -> &Comm {
-        self.comm_self.as_ref().unwrap()
+    pub fn register_comm(&mut self, comm: Comm) -> CommRegistration {
+        CommRegistration(self.registrar.track_object(comm))
     }
 
-    pub fn comm_world(&self) -> &Comm {
-        self.comm_world.as_ref().unwrap()
-    }
-
-    pub(crate) fn runtime(&self) -> &Runtime {
-        &self.runtime
-    }
-
-    pub(crate) fn runtime_mut(&mut self) -> &mut Runtime {
-        &mut self.runtime
+    pub fn free_comm(&mut self, registration: CommRegistration) {
+        self.registrar.free_object(registration.0)
     }
 
     pub fn open_port(&mut self) -> error::Result<&Port> {
