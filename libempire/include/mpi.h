@@ -94,7 +94,11 @@ enum {
 };
 
 // Defined constants
-enum { MPI_MAX_PORT_NAME = 256 };
+enum {
+    MPI_MAX_PORT_NAME = 256,
+    MPI_MAX_INFO_KEY = 255,
+    MPI_MAX_INFO_VAL = 65535,
+};
 
 #define MPI_ARGV_NULL 0
 
@@ -127,6 +131,33 @@ EMPIRE_IMPORT int MPI_Comm_test_inter(MPI_Comm comm, int *flag);
 // Section 6
 // Section 6.4
 int MPI_Comm_free(MPI_Comm *comm);
+
+// Section 9
+EMPIRE_IMPORT int MPI_Info_create(MPI_Info *info);
+EMPIRE_IMPORT int MPI_Info_set(MPI_Info info, const char *key, const char *value);
+EMPIRE_IMPORT int MPI_Info_delete(MPI_Info info, const char *key);
+
+EMPIRE_IMPORT
+int
+MPI_Info_get(
+    MPI_Info info,
+    const char *key,
+    int valuelen,
+    char *value,
+    int *flag);
+
+EMPIRE_IMPORT
+int
+MPI_Info_get_valuelen(
+    MPI_Info info,
+    const char *key,
+    int *valuelen,
+    int *flag);
+
+EMPIRE_IMPORT int MPI_Info_get_nkeys(MPI_Info info, int *nkeys);
+EMPIRE_IMPORT int MPI_Info_get_nthkey(MPI_Info info, int n, char *key);
+EMPIRE_IMPORT int MPI_Info_dup(MPI_Info info, MPI_Info *newinfo);
+EMPIRE_IMPORT int MPI_Info_free(MPI_Info *info);
 
 // Section 10
 // Port routines

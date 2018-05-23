@@ -1,4 +1,4 @@
-use super::{Info, Universe, error::{self, Error}, port::Port};
+use super::{Universe, error::{self, Error}, port::Port};
 
 use std::{io, ffi::OsString, process::Command, sync::{Arc, RwLock, Weak}};
 
@@ -11,9 +11,6 @@ pub struct SpawnCommandInfo {
     command: OsString,
     args: Vec<OsString>,
     max_procs: usize,
-
-    #[allow(dead_code)]
-    info: Option<Info>,
 }
 
 impl SpawnCommandInfo {
@@ -25,7 +22,6 @@ impl SpawnCommandInfo {
             command,
             args: itr.into_iter().map(|arg| arg.into()).collect(),
             max_procs: 1,
-            info: None,
         }
     }
 

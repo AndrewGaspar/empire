@@ -1,8 +1,8 @@
-use std::{ptr, boxed::Box, os::raw::{c_char, c_int}, sync::{Arc, RwLock}};
+use std::{ptr, os::raw::{c_char, c_int}, sync::{Arc, RwLock}};
 
-use super::{handles::*, status::*};
+use super::{handles::*, info::{MPI_Info, MPI_INFO_NULL}, status::*};
 
-use empire::{Info, Universe};
+use empire::Universe;
 
 static mut UNIVERSE: Option<Arc<RwLock<Universe>>> = None;
 
@@ -19,11 +19,6 @@ pub static mut MPI_COMM_WORLD: MPI_Comm = MPI_Comm {
 #[no_mangle]
 pub static mut MPI_COMM_NULL: MPI_Comm = MPI_Comm {
     handle: ptr::null_mut(),
-};
-
-#[no_mangle]
-pub static mut MPI_INFO_NULL: MPI_Info = MPI_Info {
-    handle: ptr::null(),
 };
 
 pub fn universe() -> &'static Arc<RwLock<Universe>> {
@@ -46,11 +41,7 @@ fn initialize_mpi() -> Error {
         MPI_COMM_WORLD = MPI_Comm::new(CommHandle::SystemComm(Arc::downgrade(&locked.comm_world())))
     };
     unsafe { MPI_COMM_NULL = MPI_Comm::new(CommHandle::NullComm) };
-    unsafe {
-        MPI_INFO_NULL = MPI_Info {
-            handle: Box::into_raw(Box::new(None)),
-        }
-    };
+    unsafe { MPI_INFO_NULL = MPI_Info::null() };
 
     Error::MPI_SUCCESS
 }
@@ -73,8 +64,7 @@ pub extern "C" fn MPI_Finalize() -> Error {
         MPI_COMM_WORLD.free();
         MPI_COMM_NULL.free();
 
-        Box::from_raw(MPI_INFO_NULL.handle as *mut Option<Info>);
-        MPI_INFO_NULL.handle = ptr::null();
+        MPI_INFO_NULL.free();
 
         UNIVERSE = None;
     }

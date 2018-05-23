@@ -1,4 +1,4 @@
-use empire::{Comm, Info, universe::CommRegistration};
+use empire::{Comm, universe::CommRegistration};
 use std::{mem, ptr, sync::{Arc, Weak}};
 
 pub enum CommHandle {
@@ -71,33 +71,5 @@ impl MPI_Comm {
                 panic!("The null communicator is not compatible with this routine.")
             }
         }
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-pub struct MPI_Info {
-    pub handle: *const Option<Info>,
-}
-
-impl MPI_Info {
-    pub unsafe fn get(&self) -> &Option<Info> {
-        assert!(
-            self.handle != ptr::null(),
-            "NULL is not an allowed value for MPI_Info. You may not have initialized MPI yet. Use \"
-            MPI_INFO_NULL instead."
-        );
-
-        &*self.handle
-    }
-
-    pub unsafe fn is_null(&self) -> bool {
-        self.get().is_none()
-    }
-
-    pub unsafe fn unwrap(&self) -> &Info {
-        (*self.handle)
-            .as_ref()
-            .expect("MPI_INFO_NULL is not allowed in this routine.")
     }
 }

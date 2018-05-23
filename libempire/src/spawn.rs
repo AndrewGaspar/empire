@@ -1,4 +1,4 @@
-use super::{status, universe, Error, handles::*};
+use super::{status, universe, Error, handles::*, info::MPI_Info};
 
 use conv::*;
 use empire::{Comm, comm::{SpawnCommandInfo, SpawnMultipleResult}};

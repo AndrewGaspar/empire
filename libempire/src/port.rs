@@ -1,4 +1,4 @@
-use super::{universe, Error, constants::*, handles::MPI_Info};
+use super::{universe, Error, constants::*, info::MPI_Info};
 
 use std::{slice, cmp::min, ffi::CStr, os::raw::c_char};
 

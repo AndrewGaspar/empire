@@ -9,6 +9,7 @@ mod status;
 
 // Contain MPI function definitions
 pub mod comm;
+pub mod info;
 pub mod init;
 pub mod port;
 pub mod spawn;
