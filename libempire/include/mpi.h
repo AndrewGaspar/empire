@@ -5,9 +5,9 @@
 #if _WIN32
 #include <vcruntime.h>
 
-#define EMPIRE_IMPORT __declspec(dllimport)
+#define EMPIRE_IMPORT extern
 #else
-#define EMPIRE_IMPORT
+#define EMPIRE_IMPORT extern
 #endif
 
 // MPI Types

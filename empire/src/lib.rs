@@ -1,5 +1,9 @@
 extern crate futures;
+
+#[cfg(not(target_arch = "wasm32"))]
 extern crate tokio;
+
+#[cfg(not(target_arch = "wasm32"))]
 extern crate tokio_process;
 
 pub mod comm;

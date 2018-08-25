@@ -10,3 +10,7 @@
 
 # CMake directores
 build*
+
+# Workspace configuration for Cargo - use to set your preferred target type
+# during development
+.cargo

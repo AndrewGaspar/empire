@@ -5,7 +5,7 @@ authors = ["Andrew Gaspar <andrew.gaspar@outlook.com>"]
 
 [lib]
 name = "empire"
-crate-type = ["cdylib"]
+crate-type = ["staticlib"]
 
 [dependencies]
 empire = { path = "../empire" }
